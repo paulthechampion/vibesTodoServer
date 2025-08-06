@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import Todo from "../models/Todo.js";
 import User from "../models/User.js";
 import { sendPushNotification } from "../utils/sendPushNotification.js";
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -32,8 +34,9 @@ export async function notifyDueTodos() {
   await mongoose.disconnect();
 }
 
-// If run directly, execute the function
-if (require.main === module) {
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
   notifyDueTodos().then(() => {
     console.log("Checked for due todos and sent notifications.");
     process.exit(0);

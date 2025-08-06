@@ -5,15 +5,18 @@ import jwt from "jsonwebtoken";
 
 const router = express.Router();
 
+// ...existing imports...
+
 // Registration
 router.post('/register', async (req, res) => {
   try {
     console.log("Register request body:", req.body);
-    const { username, password, expoPushToken } = req.body;
+    let { username, password, expoPushToken } = req.body;
     if (!username || !password) {
       console.log("Missing username or password");
       return res.status(400).json({ error: "Username and password required" });
     }
+    username = username.toLowerCase().trim();
     const existing = await User.findOne({ username });
     if (existing) {
       console.log("Username already exists:", username);
@@ -21,12 +24,15 @@ router.post('/register', async (req, res) => {
     }
     const hashed = await bcrypt.hash(password, 10);
     const user = new User({ username, password: hashed });
-    // Save expoPushToken only if present and is a string
     if (expoPushToken && typeof expoPushToken === "string") user.expoPushToken = expoPushToken;
     await user.save();
     console.log("User registered:", user.username);
     res.status(201).json({ message: "User registered" });
   } catch (err) {
+    if (err.code === 11000) {
+      // Duplicate key error (unique index violation)
+      return res.status(400).json({ error: "Username already exists" });
+    }
     console.error("Register error:", err);
     res.status(500).json({ error: "Server error" });
   }
@@ -36,11 +42,12 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     console.log("Login request body:", req.body);
-    const { username, password, expoPushToken } = req.body;
+    let { username, password, expoPushToken } = req.body;
     if (!username || !password) {
       console.log("Missing username or password");
       return res.status(400).json({ error: "Username and password required" });
     }
+    username = username.toLowerCase().trim();
     const user = await User.findOne({ username });
     if (!user) {
       console.log("User not found:", username);
@@ -51,7 +58,6 @@ router.post('/login', async (req, res) => {
       console.log("Invalid password for user:", username);
       return res.status(400).json({ error: "Invalid credentials" });
     }
-    // Only update expoPushToken if present and is a string
     if (expoPushToken && typeof expoPushToken === "string" && expoPushToken !== user.expoPushToken) {
       user.expoPushToken = expoPushToken;
       await user.save();

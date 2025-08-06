@@ -1,6 +1,8 @@
 import express from "express";
 import jwt from "jsonwebtoken";
 import Todo from "../models/Todo.js";
+import User from "../models/User.js";
+import { sendPushNotification } from "../utils/sendPushNotification.js";
 
 const router = express.Router();
 
@@ -26,11 +28,35 @@ router.get("/", auth, async (req, res) => {
   res.json(todos);
 });
 
+// Helper: Schedule notification
+function scheduleNotification(todo, user) {
+  if (!user.expoPushToken) return;
+  const deadline = new Date(todo.deadline).getTime();
+  const now = Date.now();
+  const delay = deadline - now;
+  if (delay <= 0) return; // Don't schedule if already past
+
+  setTimeout(async () => {
+    try {
+      await sendPushNotification(user.expoPushToken, {
+        title: "Task Due!",
+        body: `Your task "${todo.title}" is due now.`,
+        data: { todoId: todo._id }
+      });
+    } catch (e) {
+      console.error("Failed to send push notification:", e);
+    }
+  }, delay);
+}
+
 // Create
 router.post("/", auth, async (req, res) => {
   const { title, deadline } = req.body;
   const todo = new Todo({ userId: req.user.id, title, deadline });
   await todo.save();
+  // Schedule notification
+  const user = await User.findById(req.user.id);
+  scheduleNotification(todo, user);
   res.status(201).json(todo);
 });
 
@@ -43,6 +69,11 @@ router.put("/:id", auth, async (req, res) => {
   if (deadline !== undefined) todo.deadline = deadline;
   if (done !== undefined) todo.done = done;
   await todo.save();
+  // Schedule notification if deadline updated and not done
+  if (deadline && !todo.done) {
+    const user = await User.findById(req.user.id);
+    scheduleNotification(todo, user);
+  }
   res.json(todo);
 });
 

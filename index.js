@@ -11,8 +11,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+
+app.get("/", (req, res) => {
+  res.send("API is working");
+});
+
 app.use("/api/users", userRoutes);
-app.use("/api/todos", todoRoutes); // If you have todo routes
+app.use("/api/todos", todoRoutes);
 
 app.use("/api", (req, res) => {
   res.send("API is working");
